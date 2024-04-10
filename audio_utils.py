@@ -168,12 +168,15 @@ def windowEEG(data, sr, windowLength=0.05, frameshift=0.01):
 
     #Number of windows
     numWindows = int(np.floor((data.shape[0]-windowLength*sr)/(frameshift*sr)))
-    
-    feat = np.zeros((numWindows,data.shape[1]))
+
+    # Length of the windows
+    lenWindows = int(windowLength*sr)
+
+    feat = np.zeros((numWindows, lenWindows, data.shape[1]))
     for win in range(numWindows):
         start= int(np.floor((win*frameshift)*sr))
         stop = int(np.floor(start+windowLength*sr))
-        feat[win,:] = data[start:stop,:]
+        feat[win,:,:] = data[start:stop,:]
     return feat
 
 def stackFeatures(features, modelOrder=4, stepSize=5):

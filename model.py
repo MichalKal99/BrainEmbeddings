@@ -1,7 +1,21 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import Dataset
 
+class EegDataset(Dataset):
+
+    def __init__(self, x, y):
+        
+        self.eeg_tensor = torch.Tensor(x)
+        self.y = y
+
+    def __getitem__(self, index):
+        return self.eeg_tensor[index], self.y[index]
+        
+    def __len__(self):
+        return self.eeg_tensor.shape[0]
+    
 class baselineAutoencoder(nn.Module):
     def __init__(self, input_size, seq_length):
         super(baselineAutoencoder, self).__init__()
