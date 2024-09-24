@@ -1,3 +1,6 @@
-sentences_data/eeg
-sentences_data/sentences
-sentences_data/__pycache__
+runs/
+sentences_data/
+__pycache__/
+StreamingVocGan/
+hubert/
+*.ipynb
