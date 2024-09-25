@@ -1,7 +1,5 @@
 import os
 import numpy as np
-import sys
-
 
 def order_trajectories_chronologically(trajectories_and_ts, ordered_markers):
     # get a unique list with the words in the right order

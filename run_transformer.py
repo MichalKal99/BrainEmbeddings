@@ -1,15 +1,15 @@
+from training_files import train_autoencoder, train_transformer
+import latent_viz
 
-import train_model_latent
-import train_transformer
-import train_kmeans
-from audio_utils import get_speech_labels
+from preprocessing.audio_utils import get_speech_labels
+from preprocessing.loading_files import load_data
 import sys 
 from pathlib import Path 
 import seaborn as sns
 import os 
-
+from datetime import datetime
 import numpy as np
-import loading_files
+
 
 import matplotlib.pyplot as plt 
 
@@ -46,7 +46,7 @@ config = {
         },
         "training_epochs_autoencoder":100,
         "autoencoder_lr":1e-2,
-        "batch_size":512,
+        "batch_size":128,
         "latent_dim":64,
         "pt_colors":pt_colors
     }
@@ -54,9 +54,10 @@ config = {
 config['TR'] = {
     "latent_transformer":False,
     "number_reconstructions":60,
+    "plot_gifs":True,
     "lr":1e-4,
-    "training_epochs_transformer":5000,
-    "teacher_forcing":False,
+    "training_epochs_transformer":50,
+    "teacher_forcing":True,
     "sch_sampling":False,
     "noamOpt":False,
     "warmup":1600,
@@ -65,8 +66,8 @@ config['TR'] = {
     "encoder_seq_len":100,
     'context_length': 100,  # Adjusted sequence length
     'context_offset': 5, # int(0.050 * config['feature_extraction']['eeg_sr']),
-    'embedding_size': 64,  # embedding size
-    'hidden_size': 64,  # Number of output values
+    'embedding_size': 256,  # embedding size
+    'hidden_size': 256,  # Number of output values
     'num_heads': 8,
     'criterion': 'mse', # mcd / mse
     'dropout': 0.5,
@@ -86,40 +87,39 @@ pt_arr = ["p01"]
 if __name__ == '__main__':
     print(config)
     print(f"\nPatients: {pt_arr}")
-    
-    # Access the argument passed from the bash script
+
     if len(sys.argv) > 1:
-        new_dir_path = sys.argv[1]
-        print(new_dir_path)
+        run_dir_path = sys.argv[1]
+        print(run_dir_path)
     else:
-        new_dir_path = "."
+        run_dir_path = "."
 
     # autoencoder dict
-    os.makedirs(os.path.join(new_dir_path, "latent_data"), exist_ok=True)
-    os.makedirs(os.path.join(new_dir_path, "reconstructions_autoencoder"), exist_ok=True)
-    os.makedirs(os.path.join(new_dir_path, "clf_performance"), exist_ok=True)
+    os.makedirs(os.path.join(run_dir_path, "latent_data"), exist_ok=True)
+    os.makedirs(os.path.join(run_dir_path, "reconstructions_autoencoder"), exist_ok=True)
+    os.makedirs(os.path.join(run_dir_path, "clf_performance"), exist_ok=True)
 
     # transformer dict
-    os.makedirs(os.path.join(new_dir_path, "reconstructions_final"), exist_ok=True)
-    os.makedirs(os.path.join(new_dir_path, "reconstructions_training"), exist_ok=True)
-    os.makedirs(os.path.join(new_dir_path, "saved_models"), exist_ok=True)
-    os.makedirs(os.path.join(new_dir_path, "labeled_speech"), exist_ok=True)
-    os.makedirs(os.path.join(new_dir_path, "results_images"), exist_ok=True)
+    os.makedirs(os.path.join(run_dir_path, "reconstructions_final"), exist_ok=True)
+    os.makedirs(os.path.join(run_dir_path, "reconstructions_training"), exist_ok=True)
+    os.makedirs(os.path.join(run_dir_path, "saved_models"), exist_ok=True)
+    os.makedirs(os.path.join(run_dir_path, "labeled_speech"), exist_ok=True)
+    os.makedirs(os.path.join(run_dir_path, "results_images"), exist_ok=True)
 
     pt_data = {pt_id:{} for pt_id in pt_arr}
 
     if config["TR"]["latent_transformer"]:
 
         print("\n","#"*20, "RUNNING AUTOENCODER", "#"*20)
-        train_model_latent.main(new_dir_path, config, pt_arr)
+        train_autoencoder.main(run_dir_path, config, pt_arr)
 
         for pt_id in pt_arr:
-            train_src = np.load(f"{new_dir_path}/latent_data/train_source_encoded_{pt_id}.npy")
-            train_tgt = np.load(f"{new_dir_path}/latent_data/train_target_encoded_{pt_id}.npy")
-            val_src = np.load(f"{new_dir_path}/latent_data/val_source_encoded_{pt_id}.npy")
-            val_tgt = np.load(f"{new_dir_path}/latent_data/val_target_encoded_{pt_id}.npy")
-            test_src = np.load(f"{new_dir_path}/latent_data/test_source_encoded_{pt_id}.npy")
-            test_tgt = np.load(f"{new_dir_path}/latent_data/test_target_encoded_{pt_id}.npy")
+            train_src = np.load(f"{run_dir_path}/latent_data/train_source_encoded_{pt_id}.npy")
+            train_tgt = np.load(f"{run_dir_path}/latent_data/train_target_encoded_{pt_id}.npy")
+            val_src = np.load(f"{run_dir_path}/latent_data/val_source_encoded_{pt_id}.npy")
+            val_tgt = np.load(f"{run_dir_path}/latent_data/val_target_encoded_{pt_id}.npy")
+            test_src = np.load(f"{run_dir_path}/latent_data/test_source_encoded_{pt_id}.npy")
+            test_tgt = np.load(f"{run_dir_path}/latent_data/test_target_encoded_{pt_id}.npy")
 
             pt_data[pt_id]["train_src"] = train_src
             pt_data[pt_id]["train_tgt"] = train_tgt
@@ -131,13 +131,13 @@ if __name__ == '__main__':
             config["TR"]['num_features'] = config["latent_dim"]
 
         print("\n","#"*20, "RUNNING TRANSFORMER", "#"*20)
-        train_transformer.main(new_dir_path, config, pt_data, transformer_type="latent_")
+        train_transformer.main(run_dir_path, config, pt_data, transformer_type="latent_")
         
     else:
         
         for pt_id in pt_arr:
             config["p_id"] = pt_id
-            src, tgt, _, _, _, _, _, _, _ = loading_files.load_data(config)
+            src, tgt, _, _, _, _, _, _, _ = load_data(config)
 
             speech_labels = get_speech_labels(tgt)
 
@@ -149,12 +149,12 @@ if __name__ == '__main__':
             pt_data[pt_id]["target"] = tgt
             pt_data[pt_id]["speech_labels"] = speech_labels
         
-        train_transformer.main(new_dir_path, config, pt_data)
+        train_transformer.main(run_dir_path, config, pt_data)
 
-    # os.makedirs(os.path.join(new_dir_path, "clustering"), exist_ok=True)
+    os.makedirs(os.path.join(run_dir_path, "clustering"), exist_ok=True)
     
     # print("\n","#"*20, "RUNNING CLUSTERING", "#"*20)
-    # train_kmeans.main(config["TR"]["embedding_size"], new_dir_path, config, pt_arr, 
+    # latent_viz.main(config["TR"]["embedding_size"], run_dir_path, config, pt_arr, 
     #                   latent_data_filename="test_source_encoded_transformer", speech_labels_filename="sorted_test_speech_labels")
 
     print("\n","#"*20, "DONE!", "#"*20)

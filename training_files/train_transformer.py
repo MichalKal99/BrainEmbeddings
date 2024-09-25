@@ -1,12 +1,13 @@
 import numpy as np
-from model_utils import *
+from models.model_utils import *
+from models.transformer import * 
 from preprocessing.audio_utils import get_speech_labels, sort_speech_labels
-from dataset import TimeSeriesDataset, BatchDataset
-from model_joined_transformer import * 
-from loading_files import *
-from sklearn.preprocessing import StandardScaler
-import pickle
-import json
+from preprocessing.loading_files import *
+from models.dataset import TimeSeriesDataset, BatchDataset
+from sklearn.model_selection import train_test_split
+
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # PyTorch
 import torch
@@ -17,22 +18,13 @@ import torch.optim as optim
 # Pathlib 
 from pathlib import Path
 
-# typing
-from typing import Any
-
 # Library for progress bars in loops
 from tqdm import tqdm
 
-from sklearn.model_selection import train_test_split
 
-import sys
 import os  
-import matplotlib.pyplot as plt
+import pickle
 from datetime import datetime 
-import seaborn as sns
-import random
-
-from scipy.io import wavfile
 
 from PIL import Image
 import random
@@ -121,8 +113,6 @@ def main(new_dir_path, config, pt_data,transformer_type=""):
                 spec_plot = np.concatenate([spec_plot, tgt.cpu().detach().numpy()], axis=0)
 
             y_test_speech_labels_sorted = sort_speech_labels(y_test_speech_labels, len(test_set), config["TR"]["context_length"], config["TR"]["context_offset"]) # [ n_test_points x seq_len ]
-            print("MARKER")
-            print(y_test_speech_labels_sorted.shape)
             idx_to_plot = np.random.choice(range(y_test_speech_labels_sorted.shape[0]), 25, replace=False)
             for i in idx_to_plot:
                 spec = spec_plot[i]
@@ -515,7 +505,6 @@ def main(new_dir_path, config, pt_data,transformer_type=""):
                 test_batch_loss = criterion(mel_pred, mel_test).detach().item()
                 test_batch_corr = calculate_pearsonr(mel_pred, mel_test).cpu().detach().numpy()
                 test_batch_mcd = calculate_mcd(mel_pred, mel_test).cpu().detach().numpy()
-                print(f"test_batch_corr: {test_batch_corr.shape}")
 
                 # calculate distance 
                 test_dist = calculate_distance_spectrograms(mel_pred.cpu().detach().numpy(), mel_test.cpu().detach().numpy()) # [bs x win_size]
@@ -573,9 +562,8 @@ def main(new_dir_path, config, pt_data,transformer_type=""):
 
         for pt_id in evaluation_metrics_ppt.keys():
             print(f"Patient: {pt_id}")
-            for metric in evaluation_metrics_ppt[pt_id].keys():
-                print(f"\tMetric: {metric}")
-                print("\t",evaluation_metrics_ppt[pt_id][metric])
+            print(f"\tTest mean corr.: {evaluation_metrics_ppt[pt_id]['test_mean_corr']}")
+            print(f"\tTest mean mcd: {evaluation_metrics_ppt[pt_id]['test_mean_mcd']}")
 
         # Final reconstructions
         n_rec_samples = config["TR"]["number_reconstructions"]
@@ -615,10 +603,12 @@ def main(new_dir_path, config, pt_data,transformer_type=""):
                 waveform_true = reconstruct_and_save_audio(wave_path,f"true_audio_{i}", mel_true[0])
                 waveform_pred = reconstruct_and_save_audio(wave_path,f"rec_audio_{i}", mel_pred[0])
                 plot_audio_signal(waveform_true, waveform_pred, title=f"Audio reconstruction for {pt_id}", file_name=f"{new_dir_path}/reconstructions_final/{model_name}/audio_signals/{pt_id}/audio_signal_{i}",save_fig=True)
+    
+    if config["TR"]["plot_gifs"]:            
+        png_folder = f"{new_dir_path}/reconstructions_training/{pt_id}"
+        output_gif_name = f"{new_dir_path}/training_progress"
+        os.makedirs(output_gif_name)
+        for i in range(20):
+            create_gif_from_pngs(png_folder, output_gif_name, i)
             
-    png_folder = f"{new_dir_path}/reconstructions_training/{pt_id}"
-    output_gif_name = f"{new_dir_path}/training_progress"
-    os.makedirs(output_gif_name)
-    for i in range(20):
-        create_gif_from_pngs(png_folder, output_gif_name, i)
     print("Training complete!")

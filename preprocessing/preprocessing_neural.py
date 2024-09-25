@@ -6,9 +6,6 @@ import re
 import mne
 import scipy
 import scipy.signal
-from pathlib import Path
-import loading_files
-
 
 def _select_channels(ch_names, good_channels):
     """

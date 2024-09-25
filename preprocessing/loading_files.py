@@ -1,25 +1,23 @@
 from pathlib import Path
 import numpy as np
-import xdf
+from . import xdf
 import scipy.io.wavfile as wav
 from sklearn.preprocessing import StandardScaler
 
-import loading_files
-
 try:
-    import preprocessing_neural
+    from . import preprocessing_neural
 except:
     print('failed to load preprocessing_neural')
 try:
-    import preprocessing_audio
+    from . import preprocessing_audio
 except:
     print('failed to load preprocessing_audio')
 try:
-    import preprocessing_generic
+    from . import preprocessing_generic
 except:
     print('failed to load preprocessing_generic')
 try:
-    import preprocessing_markers
+    from . import preprocessing_markers
 except:
     print('failed to load preprocessing_markers')
 

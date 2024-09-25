@@ -1,16 +1,20 @@
+import numpy as np 
 import torch 
 import torch.nn as nn
-import numpy as np 
-from model_joined_transformer import *
-from pathlib import Path 
-from sklearn.model_selection import train_test_split
-from loading_files import *
-from audio_utils import get_speech_labels, sort_speech_labels
-from dataset import TimeSeriesDataset, BatchDataset
+from torch.utils.data import DataLoader
 import seaborn as sns
-from model_utils import *
-import sys 
+
+from models.transformer import *
+from models.model_utils import *
+from preprocessing.loading_files import load_data
+from preprocessing.audio_utils import get_speech_labels, sort_speech_labels
+from sklearn.model_selection import train_test_split
+from models.dataset import TimeSeriesDataset, BatchDataset
 import latent_viz
+
+import sys 
+import os 
+from pathlib import Path 
 
 # Create a list of unique colors for each string
 colors = sns.color_palette("husl", len(["p00", "p01", "p06",  "p07",  "p08", "p09", "p10", "p11", "p12", "p16"]))
@@ -130,7 +134,7 @@ if __name__ == '__main__':
             # latent transformer
             else: 
                 model_dir = models_paths["latent_transformer"]
-            src, tgt, _, _, _, _, _, _, _ = loading_files.load_data(config)
+            src, tgt, _, _, _, _, _, _, _ = load_data(config)
 
             X_test = np.load(f"{model_dir}/latent_data/test_source_encoded_{pt_id}.npy")
             y_test = np.load(f"{model_dir}/latent_data/test_target_encoded_{pt_id}.npy")
@@ -146,7 +150,7 @@ if __name__ == '__main__':
             np.save(f"{new_dir_path}/latent_data/sorted_test_speech_labels_{pt_id}.npy", y_test_speech_labels_sorted)
 
         else:
-            src, tgt, _, _, _, _, _, _, _ = loading_files.load_data(config)
+            src, tgt, _, _, _, _, _, _, _ = load_data(config)
 
             speech_labels = get_speech_labels(tgt)  
             

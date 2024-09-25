@@ -3,23 +3,23 @@ from scipy.stats import pearsonr
 from sklearn.metrics import mean_squared_error
 from pathlib import Path
 import seaborn as sns
-import loading_files
-from model_utils import plot_reconstruction
+from preprocessing.loading_files import load_data
+from models.model_utils import plot_reconstruction
 import pickle 
 from sklearn.model_selection import KFold, train_test_split
 import numpy as np
 import matplotlib.pyplot as plt 
 import os 
-from model_utils import calculate_pearsonr, calculate_pearsonr_np
-from dataset import TimeSeriesDataset
+from models.model_utils import calculate_pearsonr, calculate_pearsonr_np
+from models.dataset import TimeSeriesDataset
 import torch 
 from torch.utils.data import DataLoader
 
 import warnings
 warnings.filterwarnings("ignore", message="An input array is constant; the correlation coefficient is not defined.")
 
-pt_arr = ["p00", "p01", "p06",  "p07",  "p08", "p09", "p10", "p11", "p12", "p16"]
-# pt_arr = ["p01"]
+# pt_arr = ["p00", "p01", "p06",  "p07",  "p08", "p09", "p10", "p11", "p12", "p16"]
+pt_arr = ["p00", "p01"]
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
@@ -37,28 +37,13 @@ config = {
             'compensate_eeg_audio_markers': False,
             'eeg_scaling': True # normalize eeg
         },
-        'feature_selection': {
-            'apply': False,
-            'num_features': 150
-        },
         'audio_reconstruction': {
             'method': 'vocgan', # griffin_lim / vocgan
         },
-        'pca': {
-            'apply': False,
-            'num_components': 20
-        },
-        'hyperparameter_optimization': {
-            'apply': False
-        },
-        'training': {
-            'num_rands': 1000
-        },
-        "training_epochs_autoencoder":0,
         "batch_size":512,
-        "latent_dim":64,
         "pt_colors":pt_colors
     }
+
 evaluation_metrics_ppt = {pt_id:{} for pt_id in pt_arr}
 
 for pt_id in pt_arr:
@@ -68,7 +53,7 @@ for pt_id in pt_arr:
         os.makedirs(f"./linear_regression/{pt_id}")
 
     config["p_id"] = pt_id
-    eeg_feat, audio_feat, ch_names, _, _, _, _, _, _ = loading_files.load_data(config)
+    eeg_feat, audio_feat, ch_names, _, _, _, _, _, _ = load_data(config)
     
     # NO SHUFFLE
     X_train, X_test, y_train, y_test = train_test_split(eeg_feat, audio_feat, test_size=0.30, shuffle=False, random_state=0)
@@ -112,6 +97,7 @@ for pt_id in pt_arr:
     # Save the correlation coefficients for each fold
     test_corr = []
     test_mse = []
+
     # Fit the regression model
     est.fit(X_train, y_train)
     
@@ -129,10 +115,10 @@ for pt_id in pt_arr:
         if len(test_point_bin_corr) > 0:
             test_corr.append(np.mean(test_point_bin_corr))
     
-    # idx_to_plot = np.random.choice(range(X_test.shape[0]), 40, replace=False)
-    # for idx, test_idx in enumerate(idx_to_plot):
-    #     test_pred = est.predict(X_test[test_idx])
-    #     plot_reconstruction(test_pred, y_test[test_idx], title=f"Mel Spectrogram reconstruction for {pt_id}", save_fig=True, file_name=f"linear_regression/{pt_id}/spectrogram_reconstruction_{idx}")
+    idx_to_plot = np.random.choice(range(X_test.shape[0]), 40, replace=False)
+    for idx, test_idx in enumerate(idx_to_plot):
+        test_pred = est.predict(X_test[test_idx])
+        plot_reconstruction(test_pred, y_test[test_idx], title=f"Mel Spectrogram reconstruction for {pt_id}", save_fig=True, file_name=f"linear_regression/{pt_id}/spectrogram_reconstruction_{idx}")
 
     print("Average corr: ", np.average(test_corr))
     print("Average mse: ", np.average(test_mse))
@@ -143,27 +129,23 @@ for pt_id in pt_arr:
     evaluation_metrics_ppt[pt_id]["test_sem_corr"] = np.std(test_corr)/np.sqrt(len(test_corr))
     evaluation_metrics_ppt[pt_id]["n_test_points"] = len(test_corr)
 
-# # # Extract the keys, metric1 values, and metric2 values for plotting
-# # keys = list(evaluation_metrics_ppt.keys())
-# # test_mean_corr_values = [evaluation_metrics_ppt[key]['folds_corr_mean'] for key in keys]  # test_mean_corr as bar height
-# # test_std_corr_values = [evaluation_metrics_ppt[key]['folds_corr_std'] for key in keys]    # test_std_corr as error bars
-# # test_std_corr_values = [np.std(evaluation_metrics_ppt[key]['folds_corr'])/np.sqrt(len(evaluation_metrics_ppt[key]['folds_corr'])) for key in keys]    # test_std_corr as error bars
+# Extract the keys, metric1 values, and metric2 values for plotting
+patients = list(evaluation_metrics_ppt.keys())
+test_mean_corr_values = [evaluation_metrics_ppt[pt_id]['folds_corr_mean'] for pt_id in patients]  # test_mean_corr as bar height
+test_sem_corr_values = [np.std(evaluation_metrics_ppt[pt_id]['folds_corr'])/np.sqrt(len(evaluation_metrics_ppt[key]['folds_corr'])) for pt_id in patients]    # test_std_corr as error bars
 
-# # # Plot the vertical bar plot with error bars
-# # plt.figure(figsize=(10, 6))
-# # plt.bar(keys, test_mean_corr_values, yerr=test_std_corr_values, capsize=5, color='skyblue', edgecolor='black')
+# Plot the vertical bar plot with error bars
+plt.figure(figsize=(10, 6))
+plt.bar(patients, test_mean_corr_values, yerr=test_sem_corr_values, capsize=5, color='skyblue', edgecolor='black')
 
-# # # Set plot labels and title
-# # plt.xlabel('Patient')
-# # plt.ylabel('Test Correlation (%)')
-# # plt.title('Performance of EEG2MelSpectrogram transformer')
-# # plt.xticks(rotation=45, ha='right')  # Rotate x-axis labels for better readability
-# # plt.tight_layout()  # Adjust layout to prevent label clipping
-# # plt.grid(axis="y")
-# # plt.savefig("./linear_regression/lr_results_barplot.png", format='png', dpi=300)
-
-# # print(evaluation_metrics_ppt)
-
+# Set plot labels and title
+plt.xlabel('Patient')
+plt.ylabel('Test Correlation (%)')
+plt.title('Performance of EEG2MelSpectrogram transformer')
+plt.xticks(rotation=45, ha='right')  # Rotate x-axis labels for better readability
+plt.tight_layout()  # Adjust layout to prevent label clipping
+plt.grid(axis="y")
+plt.savefig("./linear_regression/lr_results_barplot.png", format='png', dpi=300)
 
 results_filename = f"lr_results_dict.pkl"
 with open(f'./saved_results/{results_filename}', 'wb') as f:

@@ -1,7 +1,7 @@
 import numpy as np
 
 from datetime import datetime
-from dataset import TimeSeriesDataset
+from models.dataset import TimeSeriesDataset
 
 import pickle 
 
@@ -12,11 +12,11 @@ import torch
 
 from torch.utils.data import DataLoader
 
-from loading_files import *
+from preprocessing.loading_files import *
+from preprocessing.audio_utils import *
 
-from model import *
-from model_utils import *
-from audio_utils import *
+from models.autoencoder import *
+from models.model_utils import *
 
 import warnings
 warnings.filterwarnings("ignore", message="An input array is constant; the correlation coefficient is not defined.")
@@ -29,7 +29,7 @@ def main(new_dir_path, config, pt_arr):
     for _, pt_id in enumerate(pt_arr):
         print(f"Patient: {pt_id}")
         config["p_id"] = pt_id
-        eeg_feat, audio_feat, ch_names, _, _, _, _, _, _ = loading_files.load_data(config)
+        eeg_feat, audio_feat, ch_names, _, _, _, _, _, _ = load_data(config)
         print("Creating train/test datasets...")
         
         X_train, X_test, y_train, y_test = train_test_split(eeg_feat, audio_feat, test_size=0.30, shuffle=False, random_state=0)

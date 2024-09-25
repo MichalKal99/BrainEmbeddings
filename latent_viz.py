@@ -7,7 +7,7 @@ from scipy.stats import zscore
 from matplotlib.colors import LinearSegmentedColormap
 
 from datetime import datetime
-from model_utils import get_signal_indicies
+from models.model_utils import get_signal_indicies
 
 from warnings import simplefilter
 from sklearn.exceptions import ConvergenceWarning

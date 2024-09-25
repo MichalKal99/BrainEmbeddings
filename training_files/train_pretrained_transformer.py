@@ -1,8 +1,8 @@
 import numpy as np
-from model_utils import *
+from models.model_utils import *
 from audio_utils import get_speech_labels, sort_speech_labels
 from model_joined_transformer import * 
-from dataset import TimeSeriesDataset, BatchDataset
+from models.dataset import TimeSeriesDataset, BatchDataset
 from loading_files import *
 
 
