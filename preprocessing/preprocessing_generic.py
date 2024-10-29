@@ -164,13 +164,13 @@ def one_shaft(x_train, y_train, **args):
 def align_features(eeg_features, audio_features, x_slice=slice(None,-10,None), y_slice=slice(20,None,None), print_stuff=True):
     if print_stuff: print('aligning')
     # align with the known slices
-    if print_stuff: print('     initially eeg_feats: {}; audio_feats: {}'.format(eeg_features.shape, audio_features.shape))
+    if print_stuff: print('\tinitially eeg_feats: {}; audio_feats: {}'.format(eeg_features.shape, audio_features.shape))
     eeg_features = eeg_features[x_slice]
     audio_features = audio_features[y_slice]
-    if print_stuff: print('     after slice eeg_feats: {}; audio_feats: {}'.format(eeg_features.shape, audio_features.shape))
+    if print_stuff: print('\tafter slice eeg_feats: {}; audio_feats: {}'.format(eeg_features.shape, audio_features.shape))
     # just in case there's still a difference at the end, compensate it
     minimum = min(len(eeg_features), len(audio_features))
     eeg_features = eeg_features[0:minimum, :]
     audio_features = audio_features[0:minimum, :]
-    if print_stuff: print('     after min eeg_feats: {}; audio_feats: {}'.format(eeg_features.shape, audio_features.shape))
+    if print_stuff: print('\tafter min eeg_feats: {}; audio_feats: {}'.format(eeg_features.shape, audio_features.shape))
     return eeg_features, audio_features

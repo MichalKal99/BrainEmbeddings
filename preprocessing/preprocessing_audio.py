@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy 
 from scipy.signal import convolve
-
 from scipy.fftpack import dct, idct
 import scipy.io.wavfile as wav
 
@@ -206,31 +206,41 @@ def extract_audio_features(audio, audio_sr, method: str, num_logmels: int) -> tu
     Raises:
     - ValueError: If the method parameter is not one of the expected values ('VocGan', 'MelSpec', 'MFCC').
     """
+    if audio_sr==22050:
+        scaled = np.int16(audio / np.max(np.abs(audio)) * 32767)
+        audio_features = StreamingVocGan.waveform_to_mel_spectrogram(
+            waveform=scaled, 
+            original_sampling_rate=audio_sr, 
+            mel_channel_count=num_logmels).T
+        return audio_features
 
-
-    # decimate audio
+    # resample audio
     if audio_sr!=48000:
         # in case the sr is not the expected one, see what do I need to do, I'll leave it like this for now
         print('weird sampling rate: {}'.format(audio_sr))
         return
-    print('     before decimation: {}'.format(audio.shape))
-    audio = np.copy(signal.decimate(audio, 3))
-    audio_sr = audio_sr/3
-    print('     after decimation: {}'.format(audio.shape))
+    
+    print('\tbefore resampling: {}'.format(audio.shape))
+    WAVE_SAMPLING_RATE = 22050
+
+    audio = scipy.signal.resample(
+        audio, int(audio.shape[0] / audio_sr * WAVE_SAMPLING_RATE)
+    )
+    audio_sr = WAVE_SAMPLING_RATE
+    scaled = np.int16(audio / np.max(np.abs(audio)) * 32767)
+    print('\tafter resampling: {}'.format(audio.shape))
 
     # extract the audio features
-    print('     length: {}s'.format(audio.shape[0]/audio_sr))
+    print('\tlength: {}s'.format(audio.shape[0]/audio_sr))
     if method == 'VocGan':
-        audio_features = StreamingVocGan.waveform_to_mel_spectrogram(waveform=audio, original_sampling_rate=audio_sr, mel_channel_count=num_logmels).T
-    # elif method == 'MelSpec':
-    #     mel_specs = mel.extractMelSpecs(audio, audio_sr, windowLength=0.0464375, frameshift=0.0115625, numFilter=num_logmels)
-    # elif method == 'MFCC':
-    #     mel_specs = mel.extractMelSpecs(audio, audio_sr, windowLength=0.0464375, frameshift=0.0115625, numFilter=num_logmels)
-    #     audio_features = mel_spectrogram_to_mfcc(mel_specs, log_already_applied=True, num_ceps=num_logmels)
+        audio_features = StreamingVocGan.waveform_to_mel_spectrogram(
+            waveform=scaled, 
+            original_sampling_rate=audio_sr, 
+            mel_channel_count=num_logmels).T
     else:
         ValueError(f'method not recognized: {method}')
 
-    print('     features: {}'.format(audio_features.shape))
+    print('\tfeatures: {}'.format(audio_features.shape))
 
     return audio_features
 

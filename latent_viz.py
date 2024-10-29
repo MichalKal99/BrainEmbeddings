@@ -174,7 +174,6 @@ def plot_traj_2d(traj_data_2d, pt_start_end_indicies, patient_datasets, colors, 
         pt_traj_tsne_data = traj_data_2d[start_idx:end_idx,:,:]
         pt_traj_color_arr = colors[start_idx:end_idx]
 
-        # silence_traj_pt, speech_traj_pt = average_sequences_by_category(pt_traj_tsne_data, patient_datasets[pt_id]["speech_labels"])
         silence_traj_pt, speech_traj_pt = pt_traj_tsne_data[patient_datasets[pt_id]["speech_indicies"]], pt_traj_tsne_data[patient_datasets[pt_id]["silence_indicies"]]
         traj_data_avg = [np.mean(speech_traj_pt, axis=0), np.mean(silence_traj_pt, axis=0)]
 

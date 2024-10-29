@@ -16,13 +16,10 @@ from scipy.stats import pearsonr, spearmanr
 from StreamingVocGan.streaming_voc_gan import StreamingVocGan
 from pathlib import Path
 simplefilter("ignore", category=ConvergenceWarning)
-import os 
 
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
-
-
-def train_model(model, dataloader, loss_fn, optimizer, epoch, total_epochs, beta=1):
+def train_model(model, dataloader, loss_fn, optimizer, epoch, total_epochs):
         
     model.train()
     
@@ -35,12 +32,8 @@ def train_model(model, dataloader, loss_fn, optimizer, epoch, total_epochs, beta
         X_train = X_train[:,None,:,:] # add depth dimension
         X_train = X_train.to(DEVICE)
 
-        if model.model_type == "vae":
-            X_rec, mean, log_var = model(X_train)
-            batch_loss, mse, kld = calculate_vae_loss(X_rec, X_train, mean, log_var,beta=beta)
-        else:
-            X_rec = model(X_train)
-            batch_loss = loss_fn(X_rec, X_train)
+        X_rec = model(X_train)
+        batch_loss = loss_fn(X_rec, X_train)
         
         # Backward pass and optimization
         optimizer.zero_grad()
@@ -62,7 +55,7 @@ def train_model(model, dataloader, loss_fn, optimizer, epoch, total_epochs, beta
     return np.mean(epoch_training_loss)
 
 
-def validate_model(model, dataloader, loss_fc, optimizer, scheduler, epoch, total_epochs, beta=1):
+def validate_model(model, dataloader, loss_fc, optimizer, scheduler, epoch, total_epochs):
     model.eval()
     progress_bar = tqdm(total=len(dataloader), dynamic_ncols=True, leave=False, position=0,  desc=f"[EPOCH {epoch+1}/{total_epochs}] validating...")
     epoch_val_loss = []
@@ -70,12 +63,8 @@ def validate_model(model, dataloader, loss_fc, optimizer, scheduler, epoch, tota
         X_val = X_val[:,None,:,:]
         X_val = X_val.to(DEVICE)
         with torch.no_grad(): # we don't need gradients in validation
-            if model.model_type == "vae":
-                X_rec, mean, log_var = model(X_val)
-                batch_loss, mse, kld = calculate_vae_loss(X_rec, X_val, mean, log_var,beta=beta)
-            else:
-                X_rec = model(X_val)
-                batch_loss = loss_fc(X_rec, X_val)
+            X_rec = model(X_val)
+            batch_loss = loss_fc(X_rec, X_val)
 
         epoch_val_loss.append(batch_loss.item())
         progress_bar.set_postfix(
@@ -102,13 +91,6 @@ def get_baseline_data(data_loader):
     source = torch.cat(source, dim=0)
     targets = torch.cat(targets, dim=0)
     return source.cpu().detach().numpy(), targets.cpu().detach().numpy()
-
-def create_val_dataset(source, targets):
-
-    source = source.reshape(-1, source.shape[3])
-    targets = targets.reshape(-1, targets.shape[3])
-
-    return source, targets
 
 def encode_data(model, data_loader, source_seq_len, target_seq_len, latent_dim, target_num_feats):
     model.eval()
@@ -177,47 +159,6 @@ def plot_cm(folds_cm, model_name, fig_title="Confusion matricies", save_fig=Fals
         plt.close()
         fig.savefig(file_name)
 
-def evaluate_classifcation(clf_data, clf_labels, models):
-    nfolds = 5
-    fold_scores = {}
-    kf = KFold(nfolds, shuffle=False)
-    accuracy_average = {type(clf).__name__ : [] for clf in models}
-    f1_neg_average = {type(clf).__name__ : [] for clf in models}
-    f1_pos_average = {type(clf).__name__ : [] for clf in models}
-    print("Classifying data")
-    for k, (train_indicies, test_indicies) in enumerate(kf.split(clf_data)):
-        
-        print(f"Fold: {k+1}/{nfolds}")
-        # create training and testing datasets
-        X_train_clf = clf_data[train_indicies, :]
-        X_test_clf = clf_data[test_indicies, :]
-
-        
-        model_results = {}
-
-        for clf in models:
-            clf = clf.fit(X_train_clf, clf_labels[train_indicies])
-            clf_name = type(clf).__name__
-            y_pred = clf.predict(X_test_clf)
-
-            f1_negative = round(f1_score(clf_labels[test_indicies], y_pred, pos_label=0),2) 
-            f1_positive = round(f1_score(clf_labels[test_indicies], y_pred, pos_label=1),2)
-            acc = round(accuracy_score(clf_labels[test_indicies], y_pred),2)
-            cm = confusion_matrix(clf_labels[test_indicies], y_pred)
-            # print(f"Class 0 F1: {f1_negative}\nClass 1 F1: {f1_positive}\nOverall Accuracy: {acc}")
-
-            accuracy_average[clf_name].append(acc)
-            f1_neg_average[clf_name].append(f1_negative)
-            f1_pos_average[clf_name].append(f1_positive)
-            model_results[clf_name] = {"accuracy":acc,
-                                                   "confusion_matrix":cm,
-                                                   "f1_negative_class":f1_negative,
-                                                   "f1_positive":f1_positive}
-        fold_scores[k] = model_results
-
-    return fold_scores, {"acc":{key: np.mean(array) for key, array in accuracy_average.items()},
-                         "f1_neg_class":{key: np.mean(array) for key, array in f1_neg_average.items()},
-                         "f1_pos_class":{key: np.mean(array) for key, array in f1_pos_average.items()}}
 
 def evaluate_regression(X_test, y_test, est):
     test_corr = []
@@ -238,56 +179,6 @@ def evaluate_regression(X_test, y_test, est):
 
     return np.average(test_corr), np.average(test_mse), np.std(test_corr)
 
-
-# def evaluate_regression(source, targets, est):
-#     nfolds = 5
-#     fold_scores = {}
-#     kf = KFold(nfolds, shuffle=False)
-#     rs = np.zeros((nfolds, targets.shape[1]))
-#     folds_mse = []
-#     folds_corr = []
-    
-#     print("Performing regression...")
-#     for k, (train, test) in enumerate(kf.split(source)):
-#         bin_corr = []
-#         print(f"Fold: {k+1}/{nfolds}")
-#         # create training and testing datasets
-#         X_train = source[train, :]
-#         X_test = source[test, :]
-
-#         # get targets
-#         y_train = targets[train, :] 
-#         y_test = targets[test,: ]
-        
-#         # Fit the regression model
-#         est.fit(X_train, y_train)
-
-#         #Predict the reconstructed spectrogram for the test data
-#         y_pred = est.predict(X_test)
-#         folds_mse.append(mean_squared_error(y_pred, y_test))
-
-#         for specBin in range(targets.shape[1]):
-#             r, p = pearsonr(y_test[:,specBin], y_pred[:,specBin])
-#             bin_corr.append(r)
-
-#         folds_corr.append(np.average(bin_corr))
-
-#     return np.average(folds_mse), np.average(folds_corr)
-
-
-def calculate_vae_loss(X_rec, X_batch, mu, logvar, beta=1):
-    reconstruction_function = nn.MSELoss()
-    MSE = reconstruction_function(X_rec, X_batch)
-
-    # https://arxiv.org/abs/1312.6114 (Appendix B)
-    # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
-
-    KLD_element = mu.pow(2).add_(logvar.exp()).mul_(-1).add_(1).add_(logvar)
-    KLD = torch.sum(KLD_element).mul_(-0.5)
-
-    return MSE + beta*KLD, MSE, KLD
-
-
 def plot_training(epochs, epoch_loss, epoch_loss_val, title="Training loss over time", file_name=None, save_fig=False):
     fig, ax = plt.subplots(1,1, figsize=(10,7.5))
     fig.suptitle(title)
@@ -300,46 +191,6 @@ def plot_training(epochs, epoch_loss, epoch_loss_val, title="Training loss over 
     ax.grid();
     ax.set_yscale("log")
 
-    if save_fig:
-        plt.close()
-        fig.savefig(file_name, bbox_inches = 'tight')
-
-def update_performance_dictionary(clf_performance_dict, metric_dict):
-    for metric in metric_dict.keys():
-        for model, value in metric_dict[metric].items():
-            clf_performance_dict[model][metric].append(value)
-    return clf_performance_dict
-
-def plot_classifier_scores(clf_average_performance, epochs_arr, baseline_metrics, fig_title="Classifier performance over training", file_name=None, save_fig=False):
-    
-    # Generate unique colors using seaborn color palette
-    colors = sns.color_palette('husl', n_colors=len(clf_average_performance.keys()))
-    colors_dict = {clf: colors[i] for i, clf in enumerate(clf_average_performance.keys())}
-
-    fig, axs = plt.subplots(1,1, figsize=(7.5,5), tight_layout=True)
-
-    axs.axhline(y=[*baseline_metrics["acc"].values()], label="baseline accuracy")
-    axs.axhline(y=[*baseline_metrics["f1_neg_class"].values()], color="red", label="baseline f1 negative class")
-    axs.axhline(y=[*baseline_metrics["f1_pos_class"].values()], color="green",label="baseline f1 positive class")
-
-    for clf, performance in clf_average_performance.items():
-
-        clf_lines = sns.lineplot(x=epochs_arr, y=performance["acc"], ax=axs,color="orange", label=clf, marker="o",legend=False)
-        l1=sns.lineplot(x=epochs_arr, y=performance["f1_neg_class"], linestyle=":", linewidth=2,ax=axs,color="red", label="F1 negative class", legend=False, marker="X")
-        l2=sns.lineplot(x=epochs_arr, y=performance["f1_pos_class"], linestyle=":", ax=axs,color="green", label="F1 positive class",legend=False, marker="X")
-
-    l = l2.get_lines()
-    labels = [line.get_label() for line in l[:6]]
-
-    axs.grid()
-    axs.set_xlabel("Epoch")
-    axs.set_ylabel("Accuracy")
-    axs.set_ybound([-0.05,1]);
-
-    
-    fig.legend(l, labels, loc="center", bbox_to_anchor=(1.15, 0.825))
-    fig.suptitle(fig_title)
-    
     if save_fig:
         plt.close()
         fig.savefig(file_name, bbox_inches = 'tight')
@@ -434,48 +285,6 @@ def count_model_parameters(model):
     model_parameters = filter(lambda p: p.requires_grad, model.parameters())
     return sum([np.prod(p.size()) for p in model_parameters])
 
-# def calculate_pearsonr(data1: np.ndarray, data2: np.ndarray) -> np.ndarray:
-#     """
-#     Evaluate the correlation between two data sets using Pearson correlation coefficient.
-
-#     Parameters:
-#     data1 (numpy.ndarray): First data set.
-#     data2 (numpy.ndarray): Second data set.
-
-#     Returns:
-#     numpy.ndarray: Array of Pearson correlation coefficients for each column.
-#     """
-#     batch_size, _, spec_bin_count = data1.shape
-#     correlation_coefficients = np.zeros((batch_size, spec_bin_count))
-#     print('Calculating Pearson...')
-    
-#     for batch in range(batch_size):
-#         for spec_bin in range(spec_bin_count):
-#             r, _ = pearsonr(data1[batch, :, spec_bin], data2[batch, :, spec_bin])
-#             correlation_coefficients[batch, spec_bin] = r
-#     return correlation_coefficients
-
-# def calculate_spearmanr(data1: np.ndarray, data2: np.ndarray) -> np.ndarray:
-#     """
-#     Evaluate the correlation between two data sets using Spearman rank correlation coefficient.
-
-#     Parameters:
-#     data1 (numpy.ndarray): First data set.
-#     data2 (numpy.ndarray): Second data set.
-
-#     Returns:
-#     numpy.ndarray: Array of Spearman correlation coefficients for each column.
-#     """
-#     batch_size, _, spec_bin_count = data1.shape
-#     correlation_coefficients = np.zeros((batch_size, spec_bin_count))
-#     print('Calculating spearmanr...')
-#     for batch in range(batch_size):
-#         for spec_bin in range(spec_bin_count):
-#             r, _ = spearmanr(data1[batch, :, spec_bin], data2[batch, :, spec_bin])
-#             correlation_coefficients[batch, spec_bin] = r
-#     return correlation_coefficients
-
-
 def calculate_pearsonr(logits, y):
     pearson_r = cosine_similarity(y-torch.mean(y,dim=1).unsqueeze(1),logits-torch.mean(logits,dim=1).unsqueeze(1),dim=1) 
     return pearson_r
@@ -497,35 +306,8 @@ def calculate_pearsonr_np(logits, y):
     
     return pearson_r
 
-def custom_inference(model, src, src_seq_len=100, tgt_seq_len=100, tgt_feats=80):
-
-    pos_eeg = torch.arange(1, src_seq_len+1).unsqueeze(0).to(DEVICE)
-
-    # Initialize decoder input with the start token
-    decoder_input = torch.zeros((src.shape[0], tgt_seq_len+1, tgt_feats)).to(DEVICE)
-    
-    pbar = tqdm(range(tgt_seq_len), desc=f"Validating...", position=0, leave=False)
-    with torch.no_grad():
-        for t in pbar:
-            pos_mel = torch.arange(1,t+2).unsqueeze(0).to(DEVICE)
-            mel_pred, attn, attn_enc, attn_dec = model(src, decoder_input[:,:t+1,:], pos_eeg, pos_mel)
-            
-            decoder_input[:,t+1,:] = mel_pred[:, -1, :].detach()
-
-    return mel_pred, attn, attn_enc, attn_dec
-
-
 
 def inference(eeg_data, model, max_length=200,target_num_feats=80):    
-    # # Hook to save attention outputs
-    # save_output = SaveOutput()
-
-    # # Patch and register hooks for all self-attention layers in the decoder
-    # for layer in model.decoder.transformer_decoder.layers:
-    #     # Patch the self-attention layer so it always returns attention weights
-    #     patch_attention(layer.self_attn)
-    #     # Register the hook to save the attention weights
-    #     layer.self_attn.register_forward_hook(save_output)
 
     with torch.no_grad():
         # Step 1: Encode EEG Data
@@ -544,9 +326,7 @@ def inference(eeg_data, model, max_length=200,target_num_feats=80):
             
             # Update decoder input to be the predicted frame
             decoder_input = torch.cat([decoder_input, predicted_frame], dim=1)  # Append new frame to input sequence
-    # print(save_output.outputs)
     return mel_lin
-
 
 def plot_spectrogram(spec, speech_labels, file_name):
     fig, axs = plt.subplots(2,1, figsize=(10,5), tight_layout=True, sharex=True)
@@ -572,9 +352,6 @@ def plot_spectrogram(spec, speech_labels, file_name):
     
     plt.close()
     fig.savefig(file_name, bbox_inches = 'tight')
-
-
-
 
 
 def plot_reconstruction(y_pred, y_test, title="Mel Spectrogram reconstruction", save_fig=False, file_name=None):
@@ -603,19 +380,11 @@ def plot_reconstruction(y_pred, y_test, title="Mel Spectrogram reconstruction", 
 def scheduled_sampling_rate(epoch, initial_rate=1.0, decay=0.995):
     return initial_rate * (decay ** epoch)
 
-
 def create_decoder_input(target_seq, start_token):
     batch_size = target_seq.size(0)
     start_tokens = start_token.repeat(batch_size, 1, 1).to(target_seq.device)  # Shape: (batch_size, 1, mel_spec_frame_dim)
     shifted_target = torch.cat([start_tokens, target_seq[:, :-1, :]], dim=1)  # Shifted right by one position
     return shifted_target
-
-
-def adjust_learning_rate(optimizer, step_num, init_lr, warmup_step=4000):
-    lr = init_lr * warmup_step**0.5 * min(step_num * warmup_step**-1.5, step_num**-0.5)
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-
 
 
 def compare_train_val(mel_train_pred, mel_val_pred, mel_true, p_id, save_fig=False, file_name=None):
@@ -696,29 +465,6 @@ def plot_audio_signal(wave_true, wave_pred,title="Audio reconstruction",file_nam
     if save_fig:
         plt.close()
         fig.savefig(file_name, bbox_inches = 'tight')
-
-
-
-class SaveOutput:
-    def __init__(self):
-        self.outputs = []
-
-    def __call__(self, module, module_in, module_out):
-        self.outputs.append(module_out[1])
-
-    def clear(self):
-        self.outputs = []
-
-def patch_attention(m):
-    forward_orig = m.forward
-
-    def wrap(*args, **kwargs):
-        kwargs["need_weights"] = True
-        kwargs["average_attn_weights"] = False
-
-        return forward_orig(*args, **kwargs)
-
-    m.forward = wrap
 
 
 def calculate_distance_spectrograms(mel_pred, mel_true):
@@ -827,62 +573,6 @@ def encode_data_transformer(model, data_loader):
     return batch_source_arr
 
 
-def encode_data_custom_transformer(model, data_loader, src_seq_len=100):
-    model.eval()
-
-    pos_eeg = torch.arange(1, src_seq_len+1).unsqueeze(0).to(DEVICE)
-
-    # Initialize an empty list to store the encoded data
-    print("Encoding data..")
-    batch_source_arr = []
-
-    # Iterate over batches in the DataLoader
-    for _, (batch_eeg, _) in enumerate(data_loader):
-        batch_eeg = batch_eeg.to(DEVICE)
-
-        with torch.no_grad():
-            batch_eeg_encoded, _, attn_enc = model.encoder(batch_eeg, pos_eeg)
-
-        batch_source_arr.append(batch_eeg_encoded.cpu().numpy())
-    batch_source_arr = np.concatenate(batch_source_arr, axis=0)
-    return batch_source_arr
-
-
-
-def plot_attn(attn, new_dir_output, num_h=8, src_seq_len=100, tgt_seq_len=100,title="Attention matrix", save_filename="attn"):
-
-    # Initialize an array to store the average attention matrices for each head in the last layer
-    average_attention_per_head = np.zeros((num_h, tgt_seq_len, src_seq_len))
-
-    # Compute the average attention matrix for each head in the last layer
-    for head in range(num_h):
-        # Extract all testing examples for this particular head in the last layer
-        head_matrices = attn[head::num_h]
-        
-        # Compute the average attention matrix across all testing examples for this head
-        average_attention_per_head[head] = np.mean(head_matrices, axis=0)
-
-    # Create a figure to summarize the information of all 8 heads in the last layer
-    fig, axes = plt.subplots(2, 4, figsize=(20, 10), tight_layout=True)  # 2 rows, 4 columns grid for the 8 heads
-    fig.suptitle(title, fontsize=16)
-
-    # Plot the average attention matrix for each head in the last layer
-    for head in range(num_h):
-        ax = axes[head // 4, head % 4]  # Organize into 2 rows and 4 columns
-        sns.heatmap(average_attention_per_head[head].T, cmap="viridis", cbar=False, ax=ax)
-        ax.set_title(f'Head {head+1}')
-        ax.set_xlabel("Token Index (Column)")
-        ax.set_ylabel("Token Index (Row)")
-
-    # Add an overall title for the figure
-
-    # Display the figure
-    plt.close()
-    fig.savefig(f"{new_dir_output}/{save_filename}.png")
-
-
-
-
 def get_signal_indicies(label_array, output_path, pt_id):
     # Initialize the lists for the indices
     speech = []
@@ -920,56 +610,6 @@ def get_signal_indicies(label_array, output_path, pt_id):
 
     # speech and silence now contain the indices
     return speech, silence, speech_ratio_arr
-
-
-def average_sequences_by_category(arr1, arr2):
-    """
-    Function to compute the average sequences for each category (0 and 1).
-    
-    Parameters:
-    arr1: np.ndarray of shape (n_sequences, sequence_length, n_features)
-          The array containing sequences with their features.
-    arr2: np.ndarray of shape (n_sequences, sequence_length)
-          The array containing classifications (0 or 1) for each time point in each sequence.
-          
-    Returns:
-    avg_0: np.ndarray of shape (sequence_length, n_features)
-           The average sequence for category 0.
-    avg_1: np.ndarray of shape (sequence_length, n_features)
-           The average sequence for category 1.
-    """
-    
-    # Ensure the input arrays have compatible shapes
-    assert arr1.shape[:2] == arr2.shape, "Shapes of arr1 and arr2 must match in the first two dimensions."
-    
-    # Determine the dimensions
-    n_sequences, sequence_length, n_features = arr1.shape
-    
-    # Create masks for category 0 and 1
-    mask_0 = (arr2 == 0)  # Mask for category 0 points
-    mask_1 = (arr2 == 1)  # Mask for category 1 points
-
-    # Initialize sums and counts for both categories
-    sum_0 = np.zeros((sequence_length, n_features))
-    sum_1 = np.zeros((sequence_length, n_features))
-    
-    # Initialize counts for both categories
-    count_0 = np.zeros(sequence_length)
-    count_1 = np.zeros(sequence_length)
-
-    # Efficiently calculate the sum of points for each category using broadcasting
-    for i in range(n_sequences):
-        sum_0 += np.where(mask_0[i][:, np.newaxis], arr1[i], 0)
-        sum_1 += np.where(mask_1[i][:, np.newaxis], arr1[i], 0)
-        count_0 += mask_0[i]
-        count_1 += mask_1[i]
-
-    # Compute the average sequences for each category, avoiding division by zero
-    avg_0 = np.divide(sum_0, count_0[:, None], where=(count_0[:, None] != 0))
-    avg_1 = np.divide(sum_1, count_1[:, None], where=(count_1[:, None] != 0))
-
-    return avg_0, avg_1
-
 
 
 def calculate_mcd(mfccs1: torch.Tensor, mfccs2: torch.Tensor) -> torch.Tensor:

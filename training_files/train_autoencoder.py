@@ -17,7 +17,7 @@ from preprocessing.audio_utils import *
 
 from models.autoencoder import *
 from models.model_utils import *
-
+from sklearn.linear_model import LinearRegression
 import warnings
 warnings.filterwarnings("ignore", message="An input array is constant; the correlation coefficient is not defined.")
 
@@ -91,10 +91,10 @@ def main(new_dir_path, config, pt_arr):
         print(X_train_lr.shape)
 
         # Regression model
-        # est = LinearRegression().fit(X_train_lr, y_train_lr)
-        # # Evaluate regression model
-        # baseline_corr, baseline_mse, baseline_corr_std = evaluate_regression(X_test_lr, y_test_lr, est)
-        # print(f"Baseline correlation: {baseline_corr}")
+        est = LinearRegression().fit(X_train_lr, y_train_lr)
+        # Evaluate regression model
+        baseline_corr, baseline_mse, baseline_corr_std = evaluate_regression(X_test_lr, y_test_lr, est)
+
         early_stopper = EarlyStopperAE(patience=10, min_delta=0)
         start_time = datetime.now()
         for epoch in range(n_epochs):
@@ -119,37 +119,37 @@ def main(new_dir_path, config, pt_arr):
             #     break
 
             # Regression VALIDATION
-            # if ((epoch+1) % 10 == 0) | (epoch == 0):
+            if ((epoch+1) % 10 == 0) | (epoch == 0):
                 
-            #     # Encode the training and testing data
-            #     X_train_latent_lr, y_train_latent_lr = encode_data(autoencoder, train_loader, 50, config['TR']["context_length"], 64, 80)
-            #     X_val_latent_lr, y_val_latent_lr = encode_data(autoencoder, val_loader, 50, config['TR']["context_length"], 64, 80)
+                # Encode the training and testing data
+                X_train_latent_lr, y_train_latent_lr = encode_data(autoencoder, train_loader, 50, config['TR']["context_length"], 64, 80)
+                X_val_latent_lr, y_val_latent_lr = encode_data(autoencoder, val_loader, 50, config['TR']["context_length"], 64, 80)
 
-            #     # Reconstruct the training and testing data
-            #     train_src_rec, train_tgt_rec = reconstruct_data(autoencoder, train_loader, eeg_feat.shape[1], config['TR']["context_length"],80) # [number of batches, bs, seq_len, number of features]
-            #     X_val_rec_lr, y_val_rec_lr = reconstruct_data(autoencoder, val_loader, eeg_feat.shape[1], config['TR']["context_length"],80) # [number of batches, bs, seq_len, number of features]
+                # Reconstruct the training and testing data
+                train_src_rec, train_tgt_rec = reconstruct_data(autoencoder, train_loader, eeg_feat.shape[1], config['TR']["context_length"],80) # [number of batches, bs, seq_len, number of features]
+                X_val_rec_lr, y_val_rec_lr = reconstruct_data(autoencoder, val_loader, eeg_feat.shape[1], config['TR']["context_length"],80) # [number of batches, bs, seq_len, number of features]
                 
-            #     # Prepare encoded data for LR 
-            #     X_train_latent_lr = np.repeat(X_train_latent_lr, repeats=2, axis=1) # from  [n_points x 50 x n_feat] -> [n_points x 100 x n_feat]
-            #     X_val_latent_lr = np.repeat(X_val_latent_lr, repeats=2, axis=1)
-            #     X_train_latent_lr, y_train_latent_lr = X_train_latent_lr.reshape(-1, X_train_latent_lr.shape[-1]), y_train_latent_lr.reshape(-1, y_train_latent_lr.shape[-1]),
+                # Prepare encoded data for LR 
+                X_train_latent_lr = np.repeat(X_train_latent_lr, repeats=2, axis=1) # from  [n_points x 50 x n_feat] -> [n_points x 100 x n_feat]
+                X_val_latent_lr = np.repeat(X_val_latent_lr, repeats=2, axis=1)
+                X_train_latent_lr, y_train_latent_lr = X_train_latent_lr.reshape(-1, X_train_latent_lr.shape[-1]), y_train_latent_lr.reshape(-1, y_train_latent_lr.shape[-1]),
 
-            #     # Train LR on latent data
-            #     est = LinearRegression().fit(X_train_latent_lr, y_train_latent_lr)
-            #     latent_corr, latent_mse, latent_corr_std = evaluate_regression(X_val_latent_lr, y_val_latent_lr, est)
+                # Train LR on latent data
+                est = LinearRegression().fit(X_train_latent_lr, y_train_latent_lr)
+                latent_corr, latent_mse, latent_corr_std = evaluate_regression(X_val_latent_lr, y_val_latent_lr, est)
                 
-            #     # Prepare reconstructed data for LR 
-            #     X_train_rec_lr, y_train_rec_lr = train_src_rec.reshape(-1, train_src_rec.shape[-1]), train_tgt_rec.reshape(-1, train_tgt_rec.shape[-1]),
+                # Prepare reconstructed data for LR 
+                X_train_rec_lr, y_train_rec_lr = train_src_rec.reshape(-1, train_src_rec.shape[-1]), train_tgt_rec.reshape(-1, train_tgt_rec.shape[-1]),
 
-            #     # Train LR on reconstructed data
-            #     est = LinearRegression().fit(X_train_rec_lr, y_train_rec_lr)
-            #     rec_corr, rec_mse, rec_corr_std = evaluate_regression(X_val_rec_lr, y_val_rec_lr, est)
+                # Train LR on reconstructed data
+                est = LinearRegression().fit(X_train_rec_lr, y_train_rec_lr)
+                rec_corr, rec_mse, rec_corr_std = evaluate_regression(X_val_rec_lr, y_val_rec_lr, est)
 
-            #     epochs_reg.append(epoch+1)
-            #     history_latent_mse.append(latent_mse)
-            #     history_latent_corr.append(latent_corr)
-            #     history_rec_mse.append(rec_mse)
-            #     history_rec_corr.append(rec_corr)
+                epochs_reg.append(epoch+1)
+                history_latent_mse.append(latent_mse)
+                history_latent_corr.append(latent_corr)
+                history_rec_mse.append(rec_mse)
+                history_rec_corr.append(rec_corr)
 
         print("="*20)
         print("Training done...")
@@ -159,9 +159,9 @@ def main(new_dir_path, config, pt_arr):
         print("Plotting training...")
         plot_training(epochs, epoch_loss, epoch_loss_val, title=f"Training for {pt_id}",save_fig=True, file_name=f"{new_dir_path}/{pt_id}_autoencoder_training_overview")
 
-        # print("Plotting classifier scores...")
-        # plot_regression_results(baseline_corr, history_latent_corr, history_rec_corr, epochs_reg, title=f"LR Speech Neuroprosthesis using different data for: {pt_id}", 
-        #                         save_fig=True, file_name=f"{new_dir_path}/clf_performance/{pt_id}_latent_space_regression")
+        print("Plotting classifier scores...")
+        plot_regression_results(baseline_corr, history_latent_corr, history_rec_corr, epochs_reg, title=f"LR Speech Neuroprosthesis using different data for: {pt_id}", 
+                                save_fig=True, file_name=f"{new_dir_path}/clf_performance/{pt_id}_latent_space_regression")
 
         # load best model
         autoencoder.load_state_dict(torch.load(f"{new_dir_path}/saved_models/autoencoder_{pt_id}.pt"))
@@ -203,10 +203,9 @@ def main(new_dir_path, config, pt_arr):
         np.save(f"{new_dir_path}/latent_data/sorted_test_speech_labels_{pt_id}", y_test_speech_labels_sorted)
         np.save(f"{new_dir_path}/latent_data/sorted_speech_labels_{pt_id}", speech_labels_sorted)
 
-        # Evaluate the model
-        
+        # Evaluate the model   
         autoencoder.eval()
-        for batch_idx, (X_test, _) in enumerate(test_loader): 
+        for _, (X_test, _) in enumerate(test_loader): 
             X_test = X_test[:,None,:,:]
             X_test = X_test.to(DEVICE)
             with torch.no_grad():
@@ -229,18 +228,13 @@ def main(new_dir_path, config, pt_arr):
         plot_reconstruction_autoencoder(test_rec.cpu().detach().numpy(), test.cpu().detach().numpy(), ch_names, limit_display=True, fig_title=f"{pt_id} sEEG signal reconstruction", save_fig=True, file_name=f"{new_dir_path}/reconstructions_autoencoder/{pt_id}_reconstruction_short")
 
         # Get LR results 
-        # X_train_latent_lr = np.repeat(train_src_encoded, repeats=2, axis=1)
-        # X_test_latent_lr = np.repeat(test_src_encoded, repeats=2, axis=1)
-        # X_train_latent_lr, y_train_latent_lr = X_train_latent_lr.reshape(-1, X_train_latent_lr.shape[-1]), train_tgt_encoded.reshape(-1, train_tgt_encoded.shape[-1]),
+        X_train_latent_lr = np.repeat(train_src_encoded, repeats=2, axis=1)
+        X_test_latent_lr = np.repeat(test_src_encoded, repeats=2, axis=1)
+        X_train_latent_lr, y_train_latent_lr = X_train_latent_lr.reshape(-1, X_train_latent_lr.shape[-1]), train_tgt_encoded.reshape(-1, train_tgt_encoded.shape[-1]),
 
-        # est = LinearRegression().fit(X_train_latent_lr, y_train_latent_lr)
-        # latent_corr, latent_mse, latent_corr_std = evaluate_regression(X_test_latent_lr, test_tgt_encoded, est)
-        
-        # evaluation_metrics_ppt[pt_id]["test_mean_corr"] = latent_corr
-        # evaluation_metrics_ppt[pt_id]["test_mean_mse"] = latent_mse
-        # evaluation_metrics_ppt[pt_id]["test_std_corr"] = latent_corr_std
-        # evaluation_metrics_ppt[pt_id]["n_test_points"] = X_test_latent_lr.shape[0]
-    
+        est = LinearRegression().fit(X_train_latent_lr, y_train_latent_lr)
+        latent_corr, latent_mse, latent_corr_std = evaluate_regression(X_test_latent_lr, test_tgt_encoded, est)
+  
     # Extracting keys and values from the dictionary
     patients = list(test_loss_ppt.keys())
     test_mean_arr = list(test_loss_ppt.values())
@@ -262,11 +256,6 @@ def main(new_dir_path, config, pt_arr):
     # Displaying the plot
     plt.savefig(f"{new_dir_path}/autoencoder_reconstruction_results.png")
     plt.close()
-
-    # results_filename = f"lr_latent_results_dict.pkl"
-    # with open(f'./saved_results/{results_filename}', 'wb') as f:
-    #     pickle.dump(evaluation_metrics_ppt, f)
-    # f.close()
 
 
     print(f"Ending script at: {datetime.now()}")

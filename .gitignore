@@ -4,5 +4,12 @@ preloaded_features/
 __pycache__/
 StreamingVocGan/
 hubert/
+audio_clips/
+tacotron2/
+segments/
+segments_pred/
+pretrained_models/
+fargan/
+*.zip
 *.ipynb
 *.sh

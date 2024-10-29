@@ -116,7 +116,7 @@ def load_data(config):
         p_ch_names.parent.mkdir(parents=True, exist_ok=True)
         
         # align features
-        eeg_feats, audio_feats = preprocessing_generic.align_features(eeg_feats, audio_feats)
+        eeg_feats, audio_feats = preprocessing_generic.align_features(eeg_feats, audio_feats, print_stuff=True)
         
 
         np.save(p_eeg_feats, eeg_feats)
