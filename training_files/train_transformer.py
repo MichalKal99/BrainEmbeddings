@@ -21,7 +21,6 @@ from pathlib import Path
 # Library for progress bars in loops
 from tqdm import tqdm
 
-
 import os  
 import pickle
 from datetime import datetime 
@@ -556,9 +555,9 @@ def main(new_dir_path, config, pt_data,transformer_type=""):
             plot_corr_spec_bins(all_test_points_averaged, f"{new_dir_path}/results_images", filename=f"corr_spec_bins")
             plot_corr_speech_ratio(all_test_bins_averaged, all_speech_labels, f"{new_dir_path}/results_images", filename=f"corr_dist_speech_ratio")
 
-        # with open(f'./saved_results/{results_filename}', 'wb') as f:
-        #     pickle.dump(evaluation_metrics_ppt, f)
-        # f.close()
+        with open(f'./saved_results/{results_filename}', 'wb') as f:
+            pickle.dump(evaluation_metrics_ppt, f)
+        f.close()
 
         for pt_id in evaluation_metrics_ppt.keys():
             print(f"Patient: {pt_id}")

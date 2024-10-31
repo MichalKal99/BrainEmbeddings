@@ -1,10 +1,10 @@
 import numpy as np
 from models.model_utils import *
-from audio_utils import get_speech_labels, sort_speech_labels
-from model_joined_transformer import * 
+from models.transformer import * 
+from preprocessing.audio_utils import get_speech_labels, sort_speech_labels
+from preprocessing.loading_files import *
 from models.dataset import TimeSeriesDataset, BatchDataset
 from loading_files import *
-
 
 # PyTorch
 import torch
@@ -15,22 +15,17 @@ import torch.optim as optim
 # Pathlib 
 from pathlib import Path
 
-# typing
-from typing import Any
-
 # Library for progress bars in loops
 from tqdm import tqdm
 
 from sklearn.model_selection import train_test_split
 
-import sys
 import os  
 import matplotlib.pyplot as plt
 from datetime import datetime 
 import seaborn as sns
 import random
 import pickle
-from scipy.io import wavfile
 
 def main(new_dir_path, config, pt_data, transformer_type=""):
     print(config)

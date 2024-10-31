@@ -268,77 +268,10 @@ def reconstruct_and_save_audio(output_path: str,
     if feat_type == 'MFCC':
         data = idct(data, type=2, axis=1, norm='ortho')
 
-    if reconstruction_method == 'griffin_lim':
-        audio = griffin_lim(data, win_length=window_size, hop_size=window_shift, audiosr=sampling_rate)
-        wav.write(output_path_standard, sampling_rate, audio)
-    elif reconstruction_method == 'vocgan':
-        # Load model
-        standard_model = StreamingVocGan(is_streaming=False,model_path=Path(".\\StreamingVocGan\\vctk_pretrained_model_3180.pt"))
-        # Convert
-        waveform_standard, processing_time = standard_model.mel_spectrogram_to_waveform(mel_spectrogram=torch.Tensor(data).to('cuda').T)
-        # Save
-        StreamingVocGan.save(waveform=waveform_standard.cpu(), file_path=output_path_standard)
-        print(f'it took: {np.round(np.sum(processing_time),3)}s to reconstruct')
-
-
-
-# def griffin_lim(spectrogram, win_length=0.05, hop_size=0.01, audiosr=16000):
-#     """ Reconstruct an audible acoustic signal using Griffin-Lim approach """
-
-#     def griffin_lim_algorithm(spec, lenWaveFile, fftsize=1024, overlap=4.0, numIterations=8):
-#         """
-#         Returns a reconstructed waveform from the spectrogram using the method in Griffin, Lim:
-#             Signal estimation from modified short-time Fourier transform,
-#             IEEE Transactions on Acoustics Speech and Signal Processing, 1984
-
-#         algo described here:
-#             Bayram, Ilker. "An analytic wavelet transform with a flexible time-frequency covering."
-#             Signal Processing, IEEE Transactions on 61.5 (2013): 1131-1142.
-#         """
-
-#         def stft(x, fftsize=1024, overlap=4.0):
-#             """Returns short time fourier transform of a signal x"""
-#             hop = int(fftsize / overlap)
-#             w = np.hanning(fftsize + 1)[:-1]  # better reconstruction with this trick +1)[:-1]
-#             return np.array([np.fft.rfft(w * x[i:i + int(fftsize)]) for i in range(0, len(x) - int(fftsize), hop)])
-
-#         def istft(X, overlap=4.0):
-#             """Returns inverse short time fourier transform of a complex spectrum X"""
-#             fftsize = (X.shape[1] - 1) * 2
-#             hop = int(fftsize / overlap)
-#             w = np.hanning(fftsize + 1)[:-1]
-#             x = np.zeros(X.shape[0] * hop)
-#             wsum = np.zeros(X.shape[0] * hop)
-#             for n, i in enumerate(range(0, len(x) - fftsize, hop)):
-#                 x[i:i + fftsize] += np.real(np.fft.irfft(X[n])) * w  # overlap-add
-#                 wsum[i:i + fftsize] += w ** 2.0
-
-#             return x
-
-#         reconstructedWav = np.random.rand(lenWaveFile * 2)
-#         for i in range(numIterations):
-#             x = stft(reconstructedWav, fftsize=fftsize, overlap=overlap)
-#             # print(str(x.shape) + '  ' + str(spec.shape))
-#             z = spec * np.exp(1j * np.angle(x[:spec.shape[0], :]))  # [:spec.shape[0],:spec.shape[1]]
-#             re = istft(z, overlap=overlap)
-#             reconstructedWav[:len(re)] = re
-#         reconstructedWav = reconstructedWav[:len(re)]
-#         return reconstructedWav
-
-#     win_len = int(win_length * audiosr)
-#     overlap = win_length / hop_size
-
-#     n_bins = int(win_len / 2 + 1)
-
-#     mfb = mel.MelFilterBank(n_bins, spectrogram.shape[1], audiosr)  # 401
-
-#     # save reconstruction as audio file
-#     for_reconstruction = mfb.fromLogMels(spectrogram)
-
-#     rec_audio = griffin_lim_algorithm(for_reconstruction, for_reconstruction.shape[0] * for_reconstruction.shape[1],
-#                                       fftsize=win_len,
-#                                       overlap=overlap)
-#     print(np.max(np.abs(rec_audio)))
-#     scaled = np.int16(rec_audio / np.max(np.abs(rec_audio)) * 32767)
-
-#     return scaled
+    # Load model
+    standard_model = StreamingVocGan(is_streaming=False,model_path=Path(".\\StreamingVocGan\\vctk_pretrained_model_3180.pt"))
+    # Convert
+    waveform_standard, processing_time = standard_model.mel_spectrogram_to_waveform(mel_spectrogram=torch.Tensor(data).to('cuda').T)
+    # Save
+    StreamingVocGan.save(waveform=waveform_standard.cpu(), file_path=output_path_standard)
+    print(f'it took: {np.round(np.sum(processing_time),3)}s to reconstruct')

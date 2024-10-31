@@ -1,0 +1,10 @@
+numpy
+torch
+seaborn
+matplotlib
+scipy
+scikit-learn
+umap-learn
+mne
+librosa
+ipython
