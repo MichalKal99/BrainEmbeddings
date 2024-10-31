@@ -20,7 +20,7 @@ The transformer and autoencoder models, along with their respective helper funct
 - `run_transformer.py`
 - `run_pretrained_transformer.py`
 
-These scripts will call the training files located in the `/training_files` directory. 
+These scripts will call the training files located in the `/training_files` directory. To train the cross-patient model, you can simply extend the `pt_arr` inside the run scripts to include multiple patients ids. 
 
 ### Configuration
 To configure the architecture of the transformer model, modify the configuration dictionary within the `run_...` scripts. To obtain latent space visualizations, ensure to select this option in the configuration dictionaries.
@@ -29,16 +29,18 @@ To configure the architecture of the transformer model, modify the configuration
 The `/StreamingVocGan` directory contains a pretrained VocGan model, which can extract mel-spectrograms from raw audio and synthesize predicted mel-spectrograms back into audio.
 
 ## Results
-Results for most experiments can be found in the `/results` directory.
+Results for most experiments can be found in the `/results` directory. The results are divided by models and patients. Most speech neuroprosthesis models contain mel-spectrogram predictions alongside audio reconstructions. Individual and cross-patient models also include the stitched results for reconstructed speech and mel-spectrograms.
 
 ## Important Note
 By default, the training scripts save extensive training and evaluation data in the main directory. It is advisable to call the main function in the training scripts with an output path specified for all runs.
 
+**IMPORTANT**: This repository does not contain the `.xdf` files and thefore the dataset on which the models were trained and evaluated on. For data availability please contact the Neural Interfacing Lab.  
+
 ## Contributions
 The following scripts were provided by Joaquín Amigó Vega from the Neural Interfacing Lab:
 - `preprocessing_audio.py`: Contains code for extracting mel-spectrograms and synthesizing speech.
-- `preprocessing_generic.py`: [Add a brief description here]
-- `preprocessing_markers.py`: [Add a brief description here]
+- `preprocessing_generic.py`
+- `preprocessing_markers.py` 
 - `preprocessing_neural.py`: Contains code for calculating neural features.
-- `preprocessing_trajectories.py`: [Add a brief description here]
+- `preprocessing_trajectories.py`
 - `loading_files.py`: Main script for the preprocessing pipeline; loads and saves the raw data and features.

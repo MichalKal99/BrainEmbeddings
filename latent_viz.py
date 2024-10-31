@@ -31,22 +31,18 @@ def main(latent_dim, new_dir_path, config, pt_arr, latent_data_filename, speech_
     colors = []
     speech_ratios = []
     
+    # extract and combine the latent spaces
     for pt_id in pt_arr:
         source_encoded = np.load(f"{new_dir_path}/latent_data/{latent_data_filename}_{pt_id}.npy")
         speech_labels = np.load(f"{new_dir_path}/latent_data/{speech_labels_filename}_{pt_id}.npy")
-        print(source_encoded.shape)
-        print(np.argwhere(np.isnan(source_encoded)))
-        print(f"speech labels: {speech_labels.shape}")
-        # source_encoded = np.load(f"{config['path_src'][pt_id]}")
-        # speech_labels = np.load(f"{config['path_speech'][pt_id]}")
-        print(f"Source encoded: {source_encoded.shape}")
 
+        # get speech and silence classes for calculating speech percentage within test examples
         speech_indicies, silence_indicies, speech_ratio_arr = get_signal_indicies(speech_labels, new_dir_path, pt_id)
         speech_ratios.extend(speech_ratio_arr)
 
+        # 
         source_encoded_avg = np.mean(source_encoded, axis=1)
         source_encoded_avg_norm = zscore(source_encoded_avg, axis=0)
-        print(np.argwhere(np.isnan(source_encoded_avg_norm)))
 
         source_encoded_flat = source_encoded.reshape(source_encoded.shape[0]*source_encoded.shape[1],source_encoded.shape[-1])
         source_encoded_flat_norm = zscore(source_encoded_flat, axis=0)

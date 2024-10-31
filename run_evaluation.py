@@ -35,7 +35,7 @@ config = {
             'num_features': 150
         },
         'audio_reconstruction': {
-            'method': 'vocgan', # griffin_lim / vocgan
+            'method': 'vocgan', # vocgan
         },
         "training_epochs_autoencoder":100,
         "autoencoder_lr":1e-2,
@@ -59,12 +59,12 @@ config['TR'] = {
     "eps":1e-9,
     "betas":(0.9, 0.98),
     "encoder_seq_len":100,
-    'context_length': 100,  # Adjusted sequence length
-    'context_offset': 5, # int(0.050 * config['feature_extraction']['eeg_sr']),
-    'embedding_size': 128,  # embedding size
-    'hidden_size': 128,  # Number of output values
+    'context_length': 100,  
+    'context_offset': 5,
+    'embedding_size': 128,  
+    'hidden_size': 128, 
     'num_heads': 8,
-    'criterion': 'mse', # mcd / mse
+    'criterion': 'mse',
     'dropout': 0.5,
     'shuffle_dataset': False,
     'encoder_layers': 3,
@@ -72,9 +72,9 @@ config['TR'] = {
     }
 
 
-
+# Stitch together mel-spectrograms
 def reconstruct_sequence_from_predictions(predictions, original_length, sequence_length=100, offset=5):
-    batch_size, seq_len, feature_size = predictions.shape
+    batch_size, _, feature_size = predictions.shape
     
     # Initialize tensors to accumulate values and counts
     reconstructed_sequence = torch.zeros([original_length-offset, feature_size])
@@ -93,6 +93,7 @@ def reconstruct_sequence_from_predictions(predictions, original_length, sequence
 # pt_arr = ["p00", "p01", "p06",  "p07",  "p08", "p09", "p10", "p11", "p12", "p16"]
 pt_arr = ["p01"]
 
+# pre-trained models path
 models_paths = {
     # "transformer":"./runs_transformer/2024-09-05_19-53-27",
     # "transformer":"./runs_transformer/2024-09-20_10-15-53",
@@ -111,6 +112,7 @@ if __name__ == '__main__':
     else:
         new_dir_path = "."
         
+    # save the model configuration
     with open(f"{new_dir_path}/transformer_config.txt", "w") as config_file:
         # Loop through each key-value pair in the dictionary
         for key, value in config["TR"].items():
@@ -121,6 +123,8 @@ if __name__ == '__main__':
     
     os.makedirs(os.path.join(new_dir_path, "latent_data"), exist_ok=True)
     bar_plot_results = {pt_id:{"test_corr":np.empty((0,80)), "test_mse":[]} for pt_id in pt_arr}
+
+    # for each patient create a model and dataset
     for pt_id in pt_arr:
         print(f"\nEvaluating: {pt_id}")
         device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -213,8 +217,11 @@ if __name__ == '__main__':
 
             # grab the current batch
             eeg_test, mel_test = eeg_test.to(device), mel_test.to(device)
-            
+
+            # make prediction
             mel_pred = inference(eeg_test, pt_model, max_length=config["TR"]['context_length'],target_num_feats=config["feature_extraction"]["num_feats"])
+            
+            # calculate test metrics
             test_corr = calculate_pearsonr(mel_pred, mel_test).cpu().detach().numpy()
             test_mse = criterion(mel_pred, mel_test).detach().item()
 
@@ -227,6 +234,7 @@ if __name__ == '__main__':
         bar_plot_results[pt_id]["test_mean_corr"] = np.mean(test_bins_averaged)
         bar_plot_results[pt_id]["test_sem_corr"] = np.std(test_bins_averaged) / np.sqrt(all_pred.shape[0])
         
+        # stitch mel-spectrograms
         all_test_pred = reconstruct_sequence_from_predictions(all_pred, test_seq_len, config["TR"]["context_length"], config["TR"]["context_offset"])
         all_test_pred = all_test_pred.unsqueeze(0)
         y_test = torch.from_numpy(y_test[:all_test_pred.shape[1]]).unsqueeze(0)
@@ -241,6 +249,7 @@ if __name__ == '__main__':
                             title=f"Mel Spectrogram reconstruction for {pt_id}", 
                             save_fig=True, file_name=f"{new_dir_path}/reconstructions_final/stitched/{pt_id}/mel_spectrogram_reconstruction_{pt_id}")
         
+        # synthesize audio
         if config["reconstruct_audio"]:
             wave_path = Path(f"{new_dir_path}/reconstructions_final/stitched/{pt_id}/")
             waveform_true = reconstruct_and_save_audio(wave_path,f"true_audio_{pt_id}", y_test[0])
@@ -257,6 +266,7 @@ if __name__ == '__main__':
         wave_path = Path(f"{new_dir_path}/reconstructions_final/window/audio/{pt_id}")
         idx_to_plot = np.random.choice(range(len(test_set)), n_rec_samples, replace=False)
 
+        # plot random mel-spectrograms predictions
         for i, data_idx in enumerate(idx_to_plot):
             eeg_input = test_set[data_idx][0][None,:,:]
             mel_true = test_set[data_idx][1][None,:,:]
@@ -269,13 +279,14 @@ if __name__ == '__main__':
                                 title=f"Mel Spectrogram reconstruction for {pt_id}\nMSE: {test_mse:.4f}, Corr: {test_corr:.4f}", save_fig=True, 
                                 file_name=f"{new_dir_path}/reconstructions_final/window/mel_spectrograms/{pt_id}/mel_spectrogram_reconstruction_{i}")
 
+            # synthesize audio
             if config["reconstruct_audio"]:
                 waveform_true = reconstruct_and_save_audio(wave_path,f"true_audio_{i}", mel_true[0])
                 waveform_pred = reconstruct_and_save_audio(wave_path,f"rec_audio_{i}", mel_pred[0])
                 plot_audio_signal(waveform_true, waveform_pred, title=f"Audio reconstruction for {pt_id}", 
                                   file_name=f"{new_dir_path}/reconstructions_final/window/audio_signals/{pt_id}/audio_signal_{i}",save_fig=True)
             
-    
+    # plot how each model performed over their test set
     pt_ids = list(bar_plot_results.keys())
     test_mean_corr = [bar_plot_results[pt]['test_mean_corr'] for pt in pt_ids]
     test_sem_corr = [bar_plot_results[pt]['test_sem_corr'] for pt in pt_ids]
@@ -293,6 +304,7 @@ if __name__ == '__main__':
 
     plt.savefig(f"{new_dir_path}/model_results.png")
 
+    # plot latent using tsne or other dimensionality reduction method
     if config["plot_latent"]:
         latent_viz.main(config["TR"]["embedding_size"], new_dir_path, config, pt_arr, 
                         latent_data_filename="test_source_encoded_transformer", speech_labels_filename="sorted_test_speech_labels")

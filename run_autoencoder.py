@@ -71,18 +71,20 @@ if __name__ == '__main__':
     else:
         run_dir_path = "."
 
-    # autoencoder dict
+    # autoencoder dirs
     os.makedirs(os.path.join(run_dir_path, "latent_data"), exist_ok=True)
     os.makedirs(os.path.join(run_dir_path, "reconstructions_autoencoder"), exist_ok=True)
     os.makedirs(os.path.join(run_dir_path, "clf_performance"), exist_ok=True)
 
+    # general dirs
     os.makedirs(os.path.join(run_dir_path, "saved_models"), exist_ok=True)
     os.makedirs(os.path.join(run_dir_path, "labeled_speech"), exist_ok=True)
 
+    # run model training
     print("\n","#"*20, "RUNNING AUTOENCODER", "#"*20)
     train_autoencoder.main(run_dir_path, config, pt_arr)
 
-
+    # run latent space visualization
     if config["plot_latent"]:
         os.makedirs(os.path.join(run_dir_path, "clustering"), exist_ok=True)
         os.makedirs(os.path.join(run_dir_path, "frames"), exist_ok=True)

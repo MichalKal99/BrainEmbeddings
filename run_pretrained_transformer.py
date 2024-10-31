@@ -89,12 +89,12 @@ if __name__ == '__main__':
     else:
         new_dir_path = "."
 
-    # autoencoder dict
+    # autoencoder dirs
     os.makedirs(os.path.join(new_dir_path, "latent_data"), exist_ok=True)
     os.makedirs(os.path.join(new_dir_path, "reconstructions_autoencoder"), exist_ok=True)
     os.makedirs(os.path.join(new_dir_path, "clf_performance"), exist_ok=True)
 
-    # transformer dict
+    # transformer dirs
     os.makedirs(os.path.join(new_dir_path, "reconstructions_final"), exist_ok=True)
     os.makedirs(os.path.join(new_dir_path, "reconstructions_training"), exist_ok=True)
     os.makedirs(os.path.join(new_dir_path, "saved_models"), exist_ok=True)
@@ -103,11 +103,13 @@ if __name__ == '__main__':
 
     pt_data = {pt_id:{} for pt_id in pt_arr}
 
+    # use latent transformer
     if config["TR"]["latent_transformer"]:
 
         print("\n","#"*20, "RUNNING AUTOENCODER", "#"*20)
         train_model_latent.main(new_dir_path, config, pt_arr)
 
+        # for each patient prepare their dataset
         for pt_id in pt_arr:
             train_src = np.load(f"{new_dir_path}/latent_data/train_source_encoded_{pt_id}.npy")
             train_tgt = np.load(f"{new_dir_path}/latent_data/train_target_encoded_{pt_id}.npy")
@@ -125,11 +127,13 @@ if __name__ == '__main__':
 
             config["TR"]['num_features'] = config["latent_dim"]
 
+        # run model training
         print("\n","#"*20, "RUNNING TRANSFORMER", "#"*20)
         train_pretrained_transformer.main(new_dir_path, config, pt_data, transformer_type="latent_pretrained_")
         
+    # use normal transformer
     else:
-        
+        # for each patient run their dataset
         for pt_id in pt_arr:
             config["p_id"] = pt_id
             src, tgt, _, _, _, _, _, _, _ = load_data(config)
@@ -147,10 +151,12 @@ if __name__ == '__main__':
         train_pretrained_transformer.main(new_dir_path, config, pt_data, transformer_type="pretrained_")
 
 
+    # make some dirs for latent space viz. 
     os.makedirs(os.path.join(new_dir_path, "clustering"), exist_ok=True)
     os.makedirs(os.path.join(new_dir_path, "frames"), exist_ok=True)
     os.makedirs(os.path.join(new_dir_path, "tsne"), exist_ok=True)
     
+    # run latent space visualziation
     print("\n","#"*20, "RUNNING CLUSTERING", "#"*20)
     latent_viz.main(config["TR"]["embedding_size"], new_dir_path, config, pt_arr, 
                       latent_data_filename="test_source_encoded_transformer", speech_labels_filename="sorted_test_speech_labels")
